@@ -35,4 +35,9 @@ class UpdateButton(CoordinatorEntity, ButtonEntity):
         )
 
     async def async_press(self):
-        await self.coordinator.async_request_refresh()
+
+        await self.hass.services.async_call(
+            DOMAIN,
+            "update",
+            blocking=True,
+        )
