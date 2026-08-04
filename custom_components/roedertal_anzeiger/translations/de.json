@@ -1,0 +1,12 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Rödertal-Anzeiger"
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Bereits eingerichtet."
+    }
+  }
+}
