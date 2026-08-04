@@ -1,12 +1,48 @@
-"""Sensoren für den Rödertal-Anzeiger."""
+"""Sensor platform."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntityDescription
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+
+
+@dataclass(frozen=True, kw_only=True)
+class RoedertalSensorDescription(SensorEntityDescription):
+    value_key: str
+
+
+SENSORS = (
+    RoedertalSensorDescription(
+        key="issue",
+        name="Ausgabe",
+        icon="mdi:newspaper",
+        value_key="issue",
+    ),
+    RoedertalSensorDescription(
+        key="date",
+        name="Datum",
+        icon="mdi:calendar",
+        value_key="date",
+    ),
+    RoedertalSensorDescription(
+        key="filename",
+        name="Datei",
+        icon="mdi:file-pdf-box",
+        value_key="filename",
+    ),
+    RoedertalSensorDescription(
+        key="status",
+        name="Status",
+        icon="mdi:download",
+        value_key="downloaded",
+    ),
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -14,21 +50,21 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
-        [
-            RoedertalIssueSensor(coordinator),
-        ]
+        RoedertalSensor(coordinator, description)
+        for description in SENSORS
     )
 
 
-class RoedertalIssueSensor(
-    CoordinatorEntity,
-    SensorEntity,
-):
-    """Sensor der aktuellen Ausgabe."""
+class RoedertalSensor(CoordinatorEntity, SensorEntity):
 
-    _attr_has_entity_name = True
-    _attr_name = "Aktuelle Ausgabe"
-    _attr_unique_id = "roedertal_current_issue"
+    def __init__(self, coordinator, description):
+        super().__init__(coordinator)
+
+        self.entity_description = description
+
+        self._attr_has_entity_name = True
+
+        self._attr_unique_id = f"{DOMAIN}_{description.key}"
 
     @property
     def device_info(self):
@@ -41,19 +77,7 @@ class RoedertalIssueSensor(
 
     @property
     def native_value(self):
-        return self.coordinator.data["issue"]
 
-    @property
-    def extra_state_attributes(self):
-
-        return {
-            "Titel": self.coordinator.data["title"],
-            "Datum": self.coordinator.data["date"],
-            "PDF": self.coordinator.data["url"],
-            "Lokale Datei": self.coordinator.data["local"],
-            "Neu heruntergeladen": self.coordinator.data["downloaded"],
-        }
-
-    @property
-    def icon(self):
-        return "mdi:newspaper"
+        return self.coordinator.data.get(
+            self.entity_description.value_key
+        )
