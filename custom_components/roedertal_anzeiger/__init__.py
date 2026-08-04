@@ -4,8 +4,10 @@ from homeassistant.core import HomeAssistant
 from .coordinator import RoedertalCoordinator
 from .const import DOMAIN
 
-PLATFORMS = ["sensor"]
-
+PLATFORMS = [
+    "sensor",
+    "button",
+]
 
 async def async_setup(hass, config):
     return True
