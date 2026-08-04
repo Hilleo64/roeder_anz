@@ -2,6 +2,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .coordinator import RoedertalCoordinator
+from .const import DOMAIN
 
 PLATFORMS = ["sensor"]
 
@@ -19,7 +20,7 @@ async def async_setup_entry(
 
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault("roedertal_anzeiger", {})[
+    hass.data.setdefault(DOMAIN, {})[
         entry.entry_id
     ] = coordinator
 

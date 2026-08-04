@@ -1,28 +1,38 @@
+"""Coordinator für den Rödertal-Anzeiger."""
+
 from __future__ import annotations
 
 import logging
 
-from bs4 import BeautifulSoup
+from aiohttp import ClientError
 
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
 
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-from .const import ARCHIVE_URL, UPDATE_INTERVAL
+from .cleanup import cleanup_archive
+from .const import (
+    ARCHIVE_URL,
+    DOMAIN,
+    KEEP_DAYS,
+    UPDATE_INTERVAL,
+)
+from .downloader import download_issue
+from .parser import parse_archive
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class RoedertalCoordinator(DataUpdateCoordinator):
+    """Koordiniert den Abruf der Daten."""
 
-    def __init__(self, hass):
+    def __init__(self, hass) -> None:
         super().__init__(
             hass,
             _LOGGER,
-            name="Rödertal-Anzeiger",
+            name=DOMAIN,
             update_interval=UPDATE_INTERVAL,
         )
 
@@ -32,28 +42,34 @@ class RoedertalCoordinator(DataUpdateCoordinator):
 
         try:
 
-            response = await session.get(ARCHIVE_URL)
+            async with session.get(ARCHIVE_URL) as response:
+                response.raise_for_status()
+                html = await response.text()
 
-            html = await response.text()
+            issue = parse_archive(html)
+
+            pdf_path, downloaded = await download_issue(
+                session=session,
+                issue=issue,
+                config_dir=self.hass.config.config_dir,
+            )
+
+            cleanup_archive(
+                pdf_path.parent,
+                KEEP_DAYS,
+            )
+
+            return {
+                "title": issue.title,
+                "date": issue.date,
+                "url": issue.url,
+                "filename": pdf_path.name,
+                "downloaded": downloaded,
+                "local": str(pdf_path),
+            }
+
+        except ClientError as err:
+            raise UpdateFailed(f"Netzwerkfehler: {err}") from err
 
         except Exception as err:
-            raise UpdateFailed(err) from err
-
-        soup = BeautifulSoup(html, "html.parser")
-
-        pdf = None
-
-        for link in soup.find_all("a"):
-
-            href = link.get("href")
-
-            if href and href.endswith(".pdf"):
-                pdf = href
-                break
-
-        if pdf is None:
-            raise UpdateFailed("Keine PDF gefunden")
-
-        return {
-            "pdf": pdf,
-        }
+            raise UpdateFailed(str(err)) from err
