@@ -45,4 +45,4 @@ async def download_issue(
 
     shutil.copy2(pdf_path, current)
 
-    return pdf_path, downloaded
+    return issue, pdf_path, downloaded

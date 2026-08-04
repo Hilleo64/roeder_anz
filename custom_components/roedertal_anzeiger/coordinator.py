@@ -48,7 +48,7 @@ class RoedertalCoordinator(DataUpdateCoordinator):
 
             issue = parse_archive(html)
 
-            pdf_path, downloaded = await download_issue(
+            issue, pdf_path, downloaded = await download_issue(
                 session=session,
                 issue=issue,
                 config_dir=self.hass.config.config_dir,
@@ -61,9 +61,10 @@ class RoedertalCoordinator(DataUpdateCoordinator):
 
             return {
                 "title": issue.title,
+                "issue": issue.issue,
                 "date": issue.date,
+                "filename": issue.filename,
                 "url": issue.url,
-                "filename": pdf_path.name,
                 "downloaded": downloaded,
                 "local": str(pdf_path),
             }

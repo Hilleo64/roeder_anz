@@ -15,8 +15,9 @@ class Issue:
 
     title: str
     url: str
+    filename: str
+    issue: str
     date: datetime | None
-
 
 def parse_archive(html: str) -> Issue:
     """Liest die neueste Ausgabe aus der Archivseite."""
@@ -59,9 +60,15 @@ def parse_archive(html: str) -> Issue:
 
                 break
 
+        filename = href.split("/")[-1]
+
+        issue = filename.replace(".pdf", "")
+
         return Issue(
             title=title,
             url=urljoin(BASE_URL, href),
+            filename=filename,
+            issue=issue,
             date=date,
         )
 

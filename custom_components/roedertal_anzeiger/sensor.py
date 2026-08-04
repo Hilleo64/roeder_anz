@@ -41,7 +41,7 @@ class RoedertalIssueSensor(
 
     @property
     def native_value(self):
-        return self.coordinator.data["filename"]
+        return self.coordinator.data["issue"]
 
     @property
     def extra_state_attributes(self):
