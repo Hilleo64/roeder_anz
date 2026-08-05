@@ -79,6 +79,8 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 ),
             )
 
+            from datetime import datetime
+
             return {
                 "issue": issue.issue,
                 "title": issue.title,
@@ -87,6 +89,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 "url": issue.url,
                 "downloaded": downloaded,
                 "local": str(pdf_path),
+                "last_update": datetime.now().isoformat(),
             }
 
         except ClientError as err:

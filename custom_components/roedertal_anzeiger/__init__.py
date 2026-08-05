@@ -8,6 +8,7 @@ from .services import async_setup_services
 PLATFORMS = [
     "sensor",
     "button",
+    "binary_sensor",
 ]
 
 async def async_setup(hass, config):

@@ -26,21 +26,27 @@ SENSORS = (
     ),
     RoedertalSensorDescription(
         key="date",
-        name="Datum",
+        name="Erscheinungsdatum",
         icon="mdi:calendar",
         value_key="date",
     ),
     RoedertalSensorDescription(
         key="filename",
-        name="Datei",
+        name="PDF-Datei",
         icon="mdi:file-pdf-box",
         value_key="filename",
     ),
     RoedertalSensorDescription(
-        key="status",
-        name="Status",
+        key="downloaded",
+        name="Neu heruntergeladen",
         icon="mdi:download",
         value_key="downloaded",
+    ),
+    RoedertalSensorDescription(
+        key="last_update",
+        name="Letzte Aktualisierung",
+        icon="mdi:update",
+        value_key="last_update",
     ),
 )
 
