@@ -80,6 +80,23 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
             )
 
             from datetime import datetime
+            from .const import EVENT_NEW_ISSUE
+
+            previous = getattr(self, "_last_issue", None)
+
+            if downloaded and previous != issue.issue:
+                self.hass.bus.async_fire(
+                    EVENT_NEW_ISSUE,
+                    {
+                        "issue": issue.issue,
+                        "title": issue.title,
+                        "date": issue.date.isoformat() if issue.date else None,
+                        "filename": issue.filename,
+                        "url": issue.url,
+                    },
+                )
+
+            self._last_issue = issue.issue
 
             return {
                 "issue": issue.issue,
