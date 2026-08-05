@@ -8,6 +8,12 @@ ARCHIVE_URL = (
     "https://www.grossroehrsdorf.de/web/aktuelles/amtsblatt-online"
 )
 
-UPDATE_INTERVAL = timedelta(hours=6)
+CONF_SCAN_INTERVAL = "scan_interval"
+CONF_KEEP_DAYS = "keep_days"
+CONF_NOTIFY = "notify"
 
-KEEP_DAYS = 183
+DEFAULT_SCAN_INTERVAL = 6
+DEFAULT_KEEP_DAYS = 183
+DEFAULT_NOTIFY = True
+
+UPDATE_INTERVAL = timedelta(hours=DEFAULT_SCAN_INTERVAL)

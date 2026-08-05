@@ -20,7 +20,10 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ):
 
-    coordinator = RoedertalCoordinator(hass)
+    coordinator = RoedertalCoordinator(
+        hass,
+        entry,
+    )
 
     await coordinator.async_config_entry_first_refresh()
 

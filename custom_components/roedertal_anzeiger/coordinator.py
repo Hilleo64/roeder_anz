@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from aiohttp import ClientError
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
@@ -15,9 +17,11 @@ from homeassistant.helpers.update_coordinator import (
 from .cleanup import cleanup_archive
 from .const import (
     ARCHIVE_URL,
+    CONF_KEEP_DAYS,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_KEEP_DAYS,
+    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    KEEP_DAYS,
-    UPDATE_INTERVAL,
 )
 from .downloader import download_issue
 from .parser import parse_archive
@@ -25,18 +29,31 @@ from .parser import parse_archive
 _LOGGER = logging.getLogger(__name__)
 
 
-class RoedertalCoordinator(DataUpdateCoordinator):
-    """Koordiniert den Abruf der Daten."""
+class RoedertalCoordinator(DataUpdateCoordinator[dict]):
+    """Koordiniert den Abruf des Rödertal-Anzeigers."""
 
-    def __init__(self, hass) -> None:
+    def __init__(self, hass, entry: ConfigEntry) -> None:
+        """Initialisieren."""
+
+        self.hass = hass
+        self.config_entry = entry
+
+        interval = timedelta(
+            hours=entry.options.get(
+                CONF_SCAN_INTERVAL,
+                DEFAULT_SCAN_INTERVAL,
+            )
+        )
+
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=UPDATE_INTERVAL,
+            update_interval=interval,
         )
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> dict:
+        """Aktualisiert die Daten."""
 
         session = async_get_clientsession(self.hass)
 
@@ -48,7 +65,7 @@ class RoedertalCoordinator(DataUpdateCoordinator):
 
             issue = parse_archive(html)
 
-            issue, pdf_path, downloaded = await download_issue(
+            pdf_path, downloaded = await download_issue(
                 session=session,
                 issue=issue,
                 config_dir=self.hass.config.config_dir,
@@ -56,12 +73,15 @@ class RoedertalCoordinator(DataUpdateCoordinator):
 
             cleanup_archive(
                 pdf_path.parent,
-                KEEP_DAYS,
+                self.config_entry.options.get(
+                    CONF_KEEP_DAYS,
+                    DEFAULT_KEEP_DAYS,
+                ),
             )
 
             return {
-                "title": issue.title,
                 "issue": issue.issue,
+                "title": issue.title,
                 "date": issue.date,
                 "filename": issue.filename,
                 "url": issue.url,
@@ -70,7 +90,14 @@ class RoedertalCoordinator(DataUpdateCoordinator):
             }
 
         except ClientError as err:
-            raise UpdateFailed(f"Netzwerkfehler: {err}") from err
+            raise UpdateFailed(
+                f"Netzwerkfehler: {err}"
+            ) from err
 
         except Exception as err:
             raise UpdateFailed(str(err)) from err
+
+    async def async_manual_refresh(self) -> None:
+        """Manuelles Aktualisieren."""
+
+        await self.async_request_refresh()

@@ -1,7 +1,7 @@
 {
   "domain": "roedertal_anzeiger",
   "name": "Rödertal-Anzeiger",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "documentation": "https://github.com/Hilleo64/roeder_anz",
   "issue_tracker": "https://github.com/Hilleo64/roeder_anz/issues",
   "codeowners": [
