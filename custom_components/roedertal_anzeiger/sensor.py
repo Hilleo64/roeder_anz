@@ -54,8 +54,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for description in SENSORS
     )
 
+from .entity import RoedertalEntity
 
-class RoedertalSensor(CoordinatorEntity, SensorEntity):
+class RoedertalSensor(RoedertalEntity, SensorEntity):
 
     def __init__(self, coordinator, description):
         super().__init__(coordinator)

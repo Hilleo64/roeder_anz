@@ -13,8 +13,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([UpdateButton(coordinator)])
 
+from .entity import RoedertalEntity
 
-class UpdateButton(CoordinatorEntity, ButtonEntity):
+class UpdateButton(RoedertalEntity, ButtonEntity):
     """Button zum manuellen Aktualisieren."""
 
     _attr_name = "Jetzt aktualisieren"
