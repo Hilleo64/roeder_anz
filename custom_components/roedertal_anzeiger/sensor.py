@@ -48,6 +48,18 @@ SENSORS = (
         icon="mdi:update",
         value_key="last_update",
     ),
+    RoedertalSensorDescription(
+    key="pdf",
+    name="PDF",
+    icon="mdi:file-pdf-box",
+    value_key="pdf",
+    ),
+    RoedertalSensorDescription(
+        key="archive_count",
+        name="Archiv",
+        icon="mdi:archive",
+        value_key="archive_count",
+    ),
 )
 
 

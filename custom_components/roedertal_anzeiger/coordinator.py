@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
-
+from .archive import get_archive
 from .cleanup import cleanup_archive
 from .const import (
     ARCHIVE_URL,
@@ -97,7 +97,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 )
 
             self._last_issue = issue.issue
-
+            archive = get_archive(pdf_path.parent.parent)
             return {
                 "issue": issue.issue,
                 "title": issue.title,
@@ -107,6 +107,9 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 "downloaded": downloaded,
                 "local": str(pdf_path),
                 "last_update": datetime.now().isoformat(),
+                "archive": archive,
+                "archive_count": len(archive),
+                "pdf": "/local/anzeiger/aktuell.pdf",
             }
 
         except ClientError as err:
