@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 
 from aiohttp import ClientError
 
@@ -13,6 +14,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+
 from .archive import get_archive
 from .cleanup import cleanup_archive
 from .const import (
@@ -22,6 +24,7 @@ from .const import (
     DEFAULT_KEEP_DAYS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    EVENT_NEW_ISSUE,
 )
 from .downloader import download_issue
 from .parser import parse_archive
@@ -30,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class RoedertalCoordinator(DataUpdateCoordinator[dict]):
-    """Koordiniert den Abruf des Rödertal-Anzeigers."""
+    """Coordinator für den Rödertal-Anzeiger."""
 
     def __init__(self, hass, entry: ConfigEntry) -> None:
         """Initialisieren."""
@@ -58,58 +61,68 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
         session = async_get_clientsession(self.hass)
 
         try:
-
             async with session.get(ARCHIVE_URL) as response:
                 response.raise_for_status()
                 html = await response.text()
 
             issue = parse_archive(html)
 
-            pdf_path, downloaded = await download_issue(
-                session=session,
-                issue=issue,
-                config_dir=self.hass.config.config_dir,
-            )
+            last_issue = self.hass.data[DOMAIN].get("last_issue")
 
-            cleanup_archive(
-                pdf_path.parent,
-                self.config_entry.options.get(
-                    CONF_KEEP_DAYS,
-                    DEFAULT_KEEP_DAYS,
-                ),
-            )
+            downloaded = False
 
-            from datetime import datetime
-            from .const import EVENT_NEW_ISSUE
+            if last_issue != issue.issue:
 
-            previous = getattr(self, "_last_issue", None)
+                pdf_path, downloaded = await download_issue(
+                    session=session,
+                    issue=issue,
+                    config_dir=self.hass.config.config_dir,
+                )
 
-            if downloaded and previous != issue.issue:
+                self.hass.data[DOMAIN]["last_issue"] = issue.issue
+
+                cleanup_archive(
+                    pdf_path.parent,
+                    self.config_entry.options.get(
+                        CONF_KEEP_DAYS,
+                        DEFAULT_KEEP_DAYS,
+                    ),
+                )
+
                 self.hass.bus.async_fire(
                     EVENT_NEW_ISSUE,
                     {
                         "issue": issue.issue,
                         "title": issue.title,
-                        "date": issue.date.isoformat() if issue.date else None,
+                        "date": issue.date.isoformat()
+                        if issue.date
+                        else None,
                         "filename": issue.filename,
                         "url": issue.url,
                     },
                 )
 
-            self._last_issue = issue.issue
-            archive = get_archive(pdf_path.parent.parent)
+            else:
+                pdf_path = (
+                    Path(self.hass.config.path("www"))
+                    / "anzeiger"
+                    / "aktuell.pdf"
+                )
+
+            archive = get_archive(pdf_path.parent)
+
             return {
                 "issue": issue.issue,
                 "title": issue.title,
                 "date": issue.date,
                 "filename": issue.filename,
                 "url": issue.url,
-                "downloaded": downloaded,
+                "pdf": "/local/anzeiger/aktuell.pdf",
                 "local": str(pdf_path),
-                "last_update": datetime.now().isoformat(),
+                "downloaded": downloaded,
                 "archive": archive,
                 "archive_count": len(archive),
-                "pdf": "/local/anzeiger/aktuell.pdf",
+                "last_update": datetime.now().isoformat(),
             }
 
         except ClientError as err:
@@ -121,6 +134,6 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
             raise UpdateFailed(str(err)) from err
 
     async def async_manual_refresh(self) -> None:
-        """Manuelles Aktualisieren."""
+        """Manuelle Aktualisierung."""
 
         await self.async_request_refresh()
