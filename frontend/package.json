@@ -1,0 +1,17 @@
+{
+  "name": "roedertal-panel",
+  "private": true,
+  "version": "0.5.0-alpha2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vite": "^7.0.6"
+  }
+}

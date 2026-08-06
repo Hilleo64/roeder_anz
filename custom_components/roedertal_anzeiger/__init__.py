@@ -7,18 +7,17 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .coordinator import RoedertalCoordinator
+from .panel import async_register_panel
+from .api import async_setup_api
+from .panel import async_setup_panel
 
 PLATFORMS = [
     "sensor",
 ]
 
 
-async def async_setup(
-    hass: HomeAssistant,
-    config,
-) -> bool:
-    """Integration laden."""
-
+async def async_setup(hass, config):
+    await async_setup_api(hass)
     return True
 
 
@@ -43,7 +42,7 @@ async def async_setup_entry(
         entry,
         PLATFORMS,
     )
-
+    await async_register_panel(hass)
     return True
 
 
