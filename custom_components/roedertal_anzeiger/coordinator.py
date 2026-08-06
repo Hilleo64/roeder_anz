@@ -2,19 +2,35 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import datetime
+
+from aiohttp import ClientError
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
+    UpdateFailed,
 )
 
+from .archive import archive_count, list_archive
+from .cleanup import cleanup_archive
 from .const import (
-    DEFAULT_SCAN_INTERVAL,
+    ARCHIVE_URL,
+    CONF_KEEP_DAYS,
+    CONF_KEEP_FILES,
+    DEFAULT_KEEP_DAYS,
+    DEFAULT_KEEP_FILES,
     DOMAIN,
+    UPDATE_INTERVAL,
 )
+from .downloader import download_issue
+from .exceptions import (
+    DownloadError,
+    ParseError,
+)
+from .parser import parse_archive
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,11 +38,11 @@ _LOGGER = logging.getLogger(__name__)
 class RoedertalCoordinator(
     DataUpdateCoordinator[dict],
 ):
-    """Zentraler Coordinator."""
+    """Coordinator."""
 
     def __init__(
         self,
-        hass: HomeAssistant,
+        hass,
         entry: ConfigEntry,
     ) -> None:
 
@@ -36,31 +52,121 @@ class RoedertalCoordinator(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(
-                hours=DEFAULT_SCAN_INTERVAL,
-            ),
+            update_interval=UPDATE_INTERVAL,
         )
 
-    async def _async_update_data(
-        self,
-    ) -> dict:
+    async def _async_update_data(self) -> dict:
         """Aktualisiert die Daten."""
 
-        #
-        # Ab alpha4 werden hier
-        #
-        # parser.py
-        # downloader.py
-        # cleanup.py
-        #
-        # aufgerufen.
-        #
+        session = async_get_clientsession(
+            self.hass
+        )
 
-        return {
-            "issue": None,
-            "title": None,
-            "date": None,
-            "pdf": "/local/anzeiger/aktuell.pdf",
-            "archive": [],
-            "status": "idle",
-        }
+        try:
+
+            #
+            # Archivseite laden
+            #
+
+            async with session.get(
+                ARCHIVE_URL
+            ) as response:
+
+                response.raise_for_status()
+
+                html = await response.text()
+
+            #
+            # Parser
+            #
+
+            issue = parse_archive(
+                html
+            )
+
+            #
+            # Download
+            #
+
+            pdf = await download_issue(
+                session=session,
+                issue=issue,
+                config_dir=self.hass.config.config_dir,
+            )
+
+            #
+            # Archiv bereinigen
+            #
+
+            cleanup_archive(
+                pdf.parent,
+                keep_days=self.entry.options.get(
+                    CONF_KEEP_DAYS,
+                    DEFAULT_KEEP_DAYS,
+                ),
+                keep_files=self.entry.options.get(
+                    CONF_KEEP_FILES,
+                    DEFAULT_KEEP_FILES,
+                ),
+            )
+
+            #
+            # Archiv lesen
+            #
+
+            archive = list_archive(
+                self.hass.config.config_dir
+            )
+
+            return {
+
+                "status": "ok",
+
+                "issue": issue.issue,
+
+                "title": issue.title,
+
+                "date": issue.date,
+
+                "filename": issue.filename,
+
+                "url": issue.url,
+
+                "pdf": "/local/anzeiger/aktuell.pdf",
+
+                "archive": [
+                    pdf.name
+                    for pdf in archive
+                ],
+
+                "archive_count": archive_count(
+                    self.hass.config.config_dir
+                ),
+
+                "last_update": datetime.now().isoformat(),
+
+            }
+
+        except ParseError as err:
+
+            raise UpdateFailed(
+                f"Parserfehler: {err}"
+            ) from err
+
+        except DownloadError as err:
+
+            raise UpdateFailed(
+                f"Downloadfehler: {err}"
+            ) from err
+
+        except ClientError as err:
+
+            raise UpdateFailed(
+                f"Netzwerkfehler: {err}"
+            ) from err
+
+        except Exception as err:
+
+            raise UpdateFailed(
+                str(err)
+            ) from err
