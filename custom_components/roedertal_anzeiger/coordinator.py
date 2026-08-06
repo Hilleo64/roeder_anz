@@ -40,6 +40,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
 
         self.hass = hass
         self.config_entry = entry
+        self._last_issue: str | None = None
 
         interval = timedelta(
             hours=entry.options.get(
@@ -67,11 +68,9 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
 
             issue = parse_archive(html)
 
-            last_issue = self.hass.data[DOMAIN].get("last_issue")
-
             downloaded = False
 
-            if last_issue != issue.issue:
+            if self._last_issue != issue.issue:
 
                 pdf_path, downloaded = await download_issue(
                     session=session,
@@ -79,7 +78,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                     config_dir=self.hass.config.config_dir,
                 )
 
-                self.hass.data[DOMAIN]["last_issue"] = issue.issue
+                self._last_issue = issue.issue
 
                 cleanup_archive(
                     pdf_path.parent,
@@ -89,18 +88,19 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                     ),
                 )
 
-                self.hass.bus.async_fire(
-                    EVENT_NEW_ISSUE,
-                    {
-                        "issue": issue.issue,
-                        "title": issue.title,
-                        "date": issue.date.isoformat()
-                        if issue.date
-                        else None,
-                        "filename": issue.filename,
-                        "url": issue.url,
-                    },
-                )
+                if downloaded:
+                    self.hass.bus.async_fire(
+                        EVENT_NEW_ISSUE,
+                        {
+                            "issue": issue.issue,
+                            "title": issue.title,
+                            "date": issue.date.isoformat()
+                            if issue.date
+                            else None,
+                            "filename": issue.filename,
+                            "url": issue.url,
+                        },
+                    )
 
             else:
                 pdf_path = (
@@ -109,7 +109,9 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                     / "aktuell.pdf"
                 )
 
-            archive = get_archive(pdf_path.parent)
+            base = pdf_path.parent.parent
+
+            archive = get_archive(base)
 
             return {
                 "issue": issue.issue,
