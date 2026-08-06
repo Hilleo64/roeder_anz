@@ -1,25 +1,32 @@
+"""Rödertal-Anzeiger."""
+
+from __future__ import annotations
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .coordinator import RoedertalCoordinator
 from .const import DOMAIN
-from .services import async_setup_services
+from .coordinator import RoedertalCoordinator
 
 PLATFORMS = [
     "sensor",
-    "button",
-    "binary_sensor",
 ]
 
-async def async_setup(hass, config):
-    await async_setup_services(hass)
+
+async def async_setup(
+    hass: HomeAssistant,
+    config,
+) -> bool:
+    """Integration laden."""
+
     return True
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
-):
+) -> bool:
+    """Config Entry laden."""
 
     coordinator = RoedertalCoordinator(
         hass,
@@ -29,11 +36,8 @@ async def async_setup_entry(
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN].setdefault("last_issue", None)
 
-    hass.data.setdefault(DOMAIN, {})[
-        entry.entry_id
-    ] = coordinator
+    hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
@@ -41,3 +45,22 @@ async def async_setup_entry(
     )
 
     return True
+
+
+async def async_unload_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> bool:
+    """Config Entry entladen."""
+
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry,
+        PLATFORMS,
+    )
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(
+            entry.entry_id,
+        )
+
+    return unload_ok

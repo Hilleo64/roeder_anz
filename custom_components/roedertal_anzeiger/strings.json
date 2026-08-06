@@ -2,11 +2,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Rödertal-Anzeiger"
+        "title": "Rödertal-Anzeiger",
+        "description": "Die Integration lädt automatisch die aktuelle Ausgabe herunter."
       }
     },
     "abort": {
-      "single_instance_allowed": "Die Integration wurde bereits eingerichtet."
+      "single_instance_allowed": "Die Integration ist bereits eingerichtet."
     }
   }
 }
