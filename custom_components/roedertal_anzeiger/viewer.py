@@ -53,7 +53,14 @@ setInterval(check, 2000);
 
 
 def register_views(hass) -> None:
-    # Called from async_setup_entry so the view is registered whenever the
-    # config entry is actually loaded.
-    if not any(getattr(view, "name", None) == "api:roedertal_anzeiger:viewer" for view in hass.http.views):
-        hass.http.register_view(RoedertalViewerView())
+    """Register the viewer once per Home Assistant instance.
+
+    HomeAssistantHTTP does not expose a public ``views`` collection, so we
+    keep our own registration flag in ``hass.data`` instead of inspecting
+    private HTTP internals.
+    """
+    key = "roedertal_anzeiger_viewer_registered"
+    if hass.data.get(key):
+        return
+    hass.http.register_view(RoedertalViewerView())
+    hass.data[key] = True
