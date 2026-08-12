@@ -4,6 +4,7 @@ from homeassistant.core import HomeAssistant
 from .coordinator import RoedertalCoordinator
 from .const import DOMAIN
 from .services import async_setup_services
+from .viewer import register_views
 
 PLATFORMS = [
     "sensor",
@@ -14,6 +15,7 @@ PLATFORMS = [
 
 async def async_setup(hass, config):
     await async_setup_services(hass)
+    register_views(hass)
     return True
 
 

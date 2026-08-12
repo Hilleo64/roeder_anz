@@ -138,6 +138,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 ],
                 "archive_count": len(archive),
                 "selected_filename": selected,
+                "selected_version": int(selected_path.stat().st_mtime_ns) if selected_path.exists() else 0,
                 "last_update": datetime.now().isoformat(),
             }
 
@@ -156,6 +157,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                     Path(issue["local"]),
                 )
                 self.data["selected_filename"] = filename
+                self.data["selected_version"] = int(Path(issue["local"]).stat().st_mtime_ns)
                 self.async_update_listeners()
                 return
 
