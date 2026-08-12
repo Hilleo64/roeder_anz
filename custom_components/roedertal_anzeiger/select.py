@@ -17,13 +17,16 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class RoedertalIssueSelect(CoordinatorEntity, SelectEntity):
     """Dropdown mit den sechs letzten Ausgaben."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
     _attr_icon = "mdi:newspaper-variant-outline"
+    _attr_entity_category = None
+    _attr_entity_registry_enabled_default = True
 
     def __init__(self, coordinator):
         super().__init__(coordinator)
-        self._attr_unique_id = f"{DOMAIN}_ausgabe_auswahl"
-        self._attr_name = "Ausgabe"
+        self._attr_unique_id = f"{DOMAIN}_ausgabe_zum_lesen"
+        self._attr_name = "Ausgabe zum Lesen"
+        # Feste Entity-ID: Das Dashboard kann unabhängig vom Anzeigenamen darauf zugreifen.
         self.entity_id = "select.roedertal_anzeiger_ausgabe"
 
     @property
