@@ -23,7 +23,8 @@ class RoedertalIssueSelect(CoordinatorEntity, SelectEntity):
     def __init__(self, coordinator):
         super().__init__(coordinator)
         self._attr_unique_id = f"{DOMAIN}_ausgabe_auswahl"
-        self._attr_name = "Ausgabe zum Lesen"
+        self._attr_name = "Ausgabe"
+        self.entity_id = "select.roedertal_anzeiger_ausgabe"
 
     @property
     def device_info(self) -> DeviceInfo:
