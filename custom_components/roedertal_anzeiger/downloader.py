@@ -17,6 +17,7 @@ async def download_issue(
     session: ClientSession,
     issue: Issue,
     config_dir: str,
+    force: bool = False,
 ) -> tuple[Path, bool]:
     """Lädt eine Ausgabe herunter, falls sie noch nicht vorhanden ist."""
 
@@ -26,6 +27,10 @@ async def download_issue(
 
     pdf_path = archive / issue.filename
     downloaded = False
+
+    if force and pdf_path.exists():
+        _LOGGER.info("Erzwinge erneuten Download von %s zur Reparatur des Archivs", issue.filename)
+        pdf_path.unlink()
 
     if not pdf_path.exists():
         _LOGGER.info("Lade %s", issue.url)

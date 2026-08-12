@@ -66,11 +66,20 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
             downloaded_issues: list[Issue] = []
             paths: list[Path] = []
 
+            # 0.4.10 repariert bereits vorhandene Archivdateien einmalig.
+            # Frühere Versionen konnten eine PDF unter dem richtigen Dateinamen,
+            # aber mit veraltetem/falschem Inhalt ablegen. Danach wird wieder nur
+            # bei fehlender Datei heruntergeladen.
+            archive_root = Path(self.hass.config.path("www")) / "anzeiger"
+            repair_marker = archive_root / ".archive_repaired_0_4_10"
+            force_redownload = not repair_marker.exists()
+
             for issue in issues:
                 pdf_path, downloaded = await download_issue(
                     session=session,
                     issue=issue,
                     config_dir=self.hass.config.config_dir,
+                    force=force_redownload,
                 )
                 paths.append(pdf_path)
                 if downloaded:
@@ -103,6 +112,10 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 self.config_entry.options.get(CONF_KEEP_DAYS, DEFAULT_KEEP_DAYS),
                 keep_count=6,
             )
+
+            # Marker erst nach erfolgreichem Download und Cleanup setzen.
+            repair_marker.parent.mkdir(parents=True, exist_ok=True)
+            repair_marker.touch()
 
             archive = get_archive(archive_dir.parent)
             available = {issue.filename for issue in issues}
