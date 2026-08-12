@@ -1,21 +1,30 @@
-# Rödertal-Anzeiger für Home Assistant
+# Rödertal-Anzeiger – Home Assistant
 
-Die Integration lädt die sechs neuesten PDF-Ausgaben des Rödertal-Anzeigers in das Home-Assistant-Verzeichnis `www/anzeiger/archiv/`.
+Home Assistant Custom Integration für den Rödertal-Anzeiger.
 
-## Lesen im Dashboard
+## Funktionen
 
-Die Integration stellt die Select-Entity `Ausgabe zum Lesen` bereit. Nach der Auswahl wird die PDF unter `/local/anzeiger/auswahl.pdf` bereitgestellt.
+- lädt die 6 neuesten PDF-Ausgaben
+- stellt die Ausgaben über eine Select-Entity zur Auswahl
+- legt die ausgewählte Ausgabe unter `/local/anzeiger/aktuell.pdf` ab
+- kompatibel mit dem vorhandenen PDF.js-Viewer
+- feuert bei einer neu heruntergeladenen Ausgabe das Event `roedertal_anzeiger_new_issue`
 
-Füge im Lovelace-Dashboard eine Webpage-/Iframe-Karte hinzu:
+## HACS-Struktur
+
+Die Integration liegt bewusst unter:
+
+`custom_components/roedertal_anzeiger/`
+
+Damit kann das Repository direkt als HACS Custom Repository verwendet werden.
+
+## PDF.js-Dashboard
+
+Die bestehende Karte kann unverändert verwendet werden:
 
 ```yaml
 type: iframe
-url: /local/anzeiger/auswahl.pdf
-aspect_ratio: 70%
+url: >-
+  /local/pdfjs/web/viewer.html?file=http://10.0.0.222:8123/local/anzeiger/aktuell.pdf
+aspect_ratio: 180%
 ```
-
-Damit kann die ausgewählte Ausgabe direkt im Home-Assistant-Dashboard gelesen werden.
-
-## Push-Benachrichtigung
-
-Bei einer neu heruntergeladenen Ausgabe wird weiterhin das Event `roedertal_anzeiger_new_issue` ausgelöst. Beim ersten Start werden die sechs vorhandenen Ausgaben nachgeladen, ohne sechs Benachrichtigungen auszulösen.
