@@ -9,6 +9,7 @@ PLATFORMS = [
     "sensor",
     "button",
     "binary_sensor",
+    "select",
 ]
 
 async def async_setup(hass, config):

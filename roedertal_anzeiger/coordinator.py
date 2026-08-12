@@ -26,8 +26,8 @@ from .const import (
     DOMAIN,
     EVENT_NEW_ISSUE,
 )
-from .downloader import download_issue
-from .parser import parse_archive
+from .downloader import download_issue, set_selected_issue
+from .parser import Issue, parse_archive
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,17 +36,13 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
     """Coordinator für den Rödertal-Anzeiger."""
 
     def __init__(self, hass, entry: ConfigEntry) -> None:
-        """Initialisieren."""
-
         self.hass = hass
         self.config_entry = entry
         self._last_issue: str | None = None
+        self._initialized = False
 
         interval = timedelta(
-            hours=entry.options.get(
-                CONF_SCAN_INTERVAL,
-                DEFAULT_SCAN_INTERVAL,
-            )
+            hours=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         )
 
         super().__init__(
@@ -57,7 +53,7 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
         )
 
     async def _async_update_data(self) -> dict:
-        """Aktualisiert die Daten."""
+        """Aktualisiert die sechs neuesten Ausgaben."""
 
         session = async_get_clientsession(self.hass)
 
@@ -66,74 +62,102 @@ class RoedertalCoordinator(DataUpdateCoordinator[dict]):
                 response.raise_for_status()
                 html = await response.text()
 
-            issue = parse_archive(html)
+            issues = parse_archive(html, limit=6)
+            downloaded_issues: list[Issue] = []
+            paths: list[Path] = []
 
-            downloaded = False
-
-            if self._last_issue != issue.issue:
-
+            for issue in issues:
                 pdf_path, downloaded = await download_issue(
                     session=session,
                     issue=issue,
                     config_dir=self.hass.config.config_dir,
                 )
-
-                self._last_issue = issue.issue
-
-                cleanup_archive(
-                    pdf_path.parent,
-                    self.config_entry.options.get(
-                        CONF_KEEP_DAYS,
-                        DEFAULT_KEEP_DAYS,
-                    ),
-                )
-
+                paths.append(pdf_path)
                 if downloaded:
+                    downloaded_issues.append(issue)
+
+            newest = issues[0]
+            is_first_update = not self._initialized
+            self._initialized = True
+
+            # Beim ersten Lauf werden die letzten sechs Ausgaben nachgeladen,
+            # aber dafür keine sechs Pushmeldungen erzeugt.
+            if not is_first_update and self._last_issue != newest.issue:
+                for issue in downloaded_issues:
                     self.hass.bus.async_fire(
                         EVENT_NEW_ISSUE,
                         {
                             "issue": issue.issue,
                             "title": issue.title,
-                            "date": issue.date.isoformat()
-                            if issue.date
-                            else None,
+                            "date": issue.date.isoformat() if issue.date else None,
                             "filename": issue.filename,
                             "url": issue.url,
                         },
                     )
 
-            else:
-                pdf_path = (
-                    Path(self.hass.config.path("www"))
-                    / "anzeiger"
-                    / "aktuell.pdf"
-                )
+            self._last_issue = newest.issue
 
-            base = pdf_path.parent.parent
+            archive_dir = Path(self.hass.config.path("www")) / "anzeiger" / "archiv"
+            cleanup_archive(
+                archive_dir,
+                self.config_entry.options.get(CONF_KEEP_DAYS, DEFAULT_KEEP_DAYS),
+                keep_count=6,
+            )
 
-            archive = get_archive(base)
+            archive = get_archive(archive_dir.parent)
+            available = {issue.filename for issue in issues}
+            archive = [name for name in archive if name in available]
+
+            # Bereits ausgewählte Ausgabe beibehalten, solange sie noch im Archiv liegt.
+            previous_selected = self.data.get("selected_filename") if self.data else None
+            selected = previous_selected if previous_selected in archive else (archive[0] if archive else paths[0].name)
+            selected_path = archive_dir / selected
+            set_selected_issue(self.hass.config.config_dir, selected_path)
 
             return {
-                "issue": issue.issue,
-                "title": issue.title,
-                "date": issue.date,
-                "filename": issue.filename,
-                "url": issue.url,
+                "issue": newest.issue,
+                "title": newest.title,
+                "date": newest.date,
+                "filename": newest.filename,
+                "url": newest.url,
                 "pdf": "/local/anzeiger/aktuell.pdf",
-                "local": str(pdf_path),
-                "downloaded": downloaded,
-                "archive": archive,
+                "selected_pdf": "/local/anzeiger/aktuell.pdf",
+                "local": str(paths[0]),
+                "downloaded": bool(downloaded_issues),
+                "archive": [
+                    {
+                        "issue": issue.issue,
+                        "title": issue.title,
+                        "date": issue.date,
+                        "filename": issue.filename,
+                        "url": issue.url,
+                        "local": str(archive_dir / issue.filename),
+                    }
+                    for issue in issues
+                    if (archive_dir / issue.filename).exists()
+                ],
                 "archive_count": len(archive),
+                "selected_filename": selected,
                 "last_update": datetime.now().isoformat(),
             }
 
         except ClientError as err:
-            raise UpdateFailed(
-                f"Netzwerkfehler: {err}"
-            ) from err
-
+            raise UpdateFailed(f"Netzwerkfehler: {err}") from err
         except Exception as err:
             raise UpdateFailed(str(err)) from err
+
+    def select_issue(self, filename: str) -> None:
+        """Wählt eine archivierte Ausgabe für die Anzeige aus."""
+
+        for issue in self.data.get("archive", []):
+            if issue["filename"] == filename:
+                set_selected_issue(
+                    self.hass.config.config_dir,
+                    Path(issue["local"]),
+                )
+                self.data["selected_filename"] = filename
+                self.async_update_listeners()
+                return
 
     async def async_manual_refresh(self) -> None:
         """Manuelle Aktualisierung."""
