@@ -15,7 +15,6 @@ PLATFORMS = [
 
 async def async_setup(hass, config):
     await async_setup_services(hass)
-    register_views(hass)
     return True
 
 
@@ -30,6 +29,7 @@ async def async_setup_entry(
     )
 
     await coordinator.async_config_entry_first_refresh()
+    register_views(hass)
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN].setdefault("last_issue", None)

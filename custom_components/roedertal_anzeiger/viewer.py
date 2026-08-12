@@ -5,15 +5,19 @@ from __future__ import annotations
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
-from .const import DOMAIN
-
 
 class RoedertalViewerView(HomeAssistantView):
-    """Serve a small page that keeps the PDF.js viewer in sync with the select entity."""
+    """A small wrapper around the existing PDF.js viewer.
+
+    The wrapper keeps the existing PDF.js setup but reloads the PDF with a
+    cache-busting query parameter whenever the selected local PDF changes.
+    No Home Assistant API authentication is required because this page only
+    serves the public local PDF path already used by the dashboard.
+    """
 
     url = "/api/roedertal_anzeiger/viewer"
     name = "api:roedertal_anzeiger:viewer"
-    requires_auth = True
+    requires_auth = False
 
     async def get(self, request: web.Request) -> web.Response:
         html = """<!doctype html>
@@ -23,46 +27,33 @@ class RoedertalViewerView(HomeAssistantView):
 <iframe id="pdf" title="Rödertal-Anzeiger"></iframe>
 <script>
 const pdf = document.getElementById('pdf');
-let last = null;
-async function update() {
+let lastUrl = null;
+let lastStamp = null;
+function loadPdf(stamp) {
+  const url = '/local/anzeiger/aktuell.pdf?v=' + encodeURIComponent(stamp);
+  if (url === lastUrl) return;
+  lastUrl = url;
+  pdf.src = '/local/pdfjs/web/viewer.html?file=' + encodeURIComponent(url);
+}
+async function check() {
   try {
-    const r = await fetch('/api/roedertal_anzeiger/selected', {cache:'no-store'});
+    const r = await fetch('/local/anzeiger/aktuell.pdf?check=' + Date.now(), {cache:'no-store'});
     if (!r.ok) return;
-    const d = await r.json();
-    if (!d.filename) return;
-    if (d.filename !== last) {
-      last = d.filename;
-      pdf.src = '/local/pdfjs/web/viewer.html?file=' + encodeURIComponent(d.url) + '&v=' + encodeURIComponent(d.version);
+    const stamp = r.headers.get('last-modified') || r.headers.get('etag') || String(r.headers.get('content-length') || '') + ':' + String(Date.now() / 5000 | 0);
+    if (stamp !== lastStamp) {
+      lastStamp = stamp;
+      loadPdf(stamp);
     }
   } catch (e) {}
 }
-update();
-setInterval(update, 1000);
+check();
+setInterval(check, 2000);
 </script></body></html>"""
         return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-store"})
 
 
-class RoedertalSelectedView(HomeAssistantView):
-    """Return the currently selected local PDF."""
-
-    url = "/api/roedertal_anzeiger/selected"
-    name = "api:roedertal_anzeiger:selected"
-    requires_auth = True
-
-    async def get(self, request: web.Request) -> web.Response:
-        hass = request.app["hass"]
-        coordinators = hass.data.get(DOMAIN, {})
-        coordinator = next(iter(coordinators.values()), None)
-        if coordinator is None or not coordinator.data:
-            return web.json_response({"filename": None, "url": None, "version": 0})
-        data = coordinator.data
-        return web.json_response({
-            "filename": data.get("selected_filename"),
-            "url": "/local/anzeiger/aktuell.pdf",
-            "version": data.get("selected_version", 0),
-        }, headers={"Cache-Control": "no-store"})
-
-
 def register_views(hass) -> None:
-    hass.http.register_view(RoedertalViewerView())
-    hass.http.register_view(RoedertalSelectedView())
+    # Called from async_setup_entry so the view is registered whenever the
+    # config entry is actually loaded.
+    if not any(getattr(view, "name", None) == "api:roedertal_anzeiger:viewer" for view in hass.http.views):
+        hass.http.register_view(RoedertalViewerView())
